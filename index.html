@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>LankaEconomy.lk — Sri Lanka &amp; Global Economic Data Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&amp;family=Noto+Serif+Sinhala:wght@400;700&amp;display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="assets/style.css"/>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" defer></script>
+</head>
+<body data-g="lk">
+
+  <!-- Topbar with Sri Lanka / World Switcher (matching uploaded XML theme) -->
+  <div class="topbar">
+    <div class="wrap">
+      <div class="switch" role="tablist" aria-label="Region Mode">
+        <button type="button" class="sw lk" id="btn-mode-lk" onclick="App.setGroup('lk')">Sri Lanka</button>
+        <button type="button" class="sw wd" id="btn-mode-wd" onclick="App.setGroup('wd')">World</button>
+      </div>
+      <div class="topbar-right">
+        <span id="today"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Site Header with LankaEconomy.lk Brand Logo, News Button, Search & Refresh -->
+  <header class="site-head">
+    <div class="wrap">
+      <a class="logo" href="#" onclick="App.setCategory('All');return false;">
+        <svg height="46" viewBox="0 0 64 56" width="52">
+          <rect fill="#0b63b8" height="18" rx="2" width="13" x="2" y="34"/>
+          <rect fill="#0b63b8" height="28" rx="2" width="13" x="20" y="24"/>
+          <rect fill="#0b63b8" height="38" rx="2" width="13" x="38" y="14"/>
+          <path d="M2 32C22 28 40 18 52 6" fill="none" stroke="#2e9a14" stroke-linecap="round" stroke-width="4"/>
+          <path d="M41 3L59 1L57 19Z" fill="#2e9a14"/>
+        </svg>
+        <span><b>Lanka</b><em>Economy</em><i>.</i><b>lk</b></span>
+        <span class="logo-sub" id="dataset-badge">Economic Data Dashboard</span>
+      </a>
+
+      <div class="head-actions">
+        <a class="btn-news" id="btn-news" href="https://lankaneconomy.blogspot.com/" title="Go to News Page">
+          <svg fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewBox="0 0 24 24" width="16">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+          News
+        </a>
+        <form class="sf" id="search-form" onsubmit="return false;">
+          <input id="search-input" type="search" placeholder="Search economic indicators..." autocomplete="off"/>
+          <button type="button" aria-label="Search">
+            <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-width="2.4" viewBox="0 0 24 24" width="20">
+              <circle cx="10.5" cy="10.5" r="6.5"/>
+              <path d="M15.5 15.5L21 21"/>
+            </svg>
+          </button>
+          <div class="search-pop" id="search-pop"></div>
+        </form>
+        <button type="button" class="btn-refresh" id="btn-refresh" onclick="App.refreshBackend()" title="Refresh latest economic data">
+          ⟳ Sync Data
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Live Indicator Ticker -->
+  <div class="ticker">
+    <div class="wrap">
+      <b class="badge" id="ticker-badge">Latest Indicators</b>
+      <div id="tick"></div>
+    </div>
+  </div>
+
+  <!-- Main Single-Column Full-Width Dashboard Layout (No Side Panel) -->
+  <div class="wrap layout-full">
+    <main class="col" id="main-col">
+
+      <!-- Sector Filter Pills -->
+      <div class="cat-bar" id="cat-bar" role="tablist" aria-label="Sector Filter"></div>
+
+      <!-- Headline KPI Cards Strip -->
+      <section class="kpi-grid" id="kpi-strip" aria-label="Headline Indicators"></section>
+
+      <!-- Interactive Chart Workbench with Adjustable Time Period -->
+      <section class="workbench" id="workbench">
+        <div class="wb-header">
+          <div class="wb-title-block">
+            <span class="tag-badge" id="wb-cat-badge">Sri Lanka Economy</span>
+            <h2 id="wb-title">Loading Economic Data...</h2>
+            <div class="wb-meta">
+              <span id="wb-unit">Unit: —</span>
+              <span>•</span>
+              <span id="wb-freq">Frequency: —</span>
+              <span>•</span>
+              <span id="wb-span">Available: —</span>
+            </div>
+          </div>
+          <div class="preset-group">
+            <button type="button" class="tbtn" onclick="App.downloadCSV()" title="Download filtered time-series as CSV">⬇ Export CSV</button>
+            <button type="button" class="tbtn" onclick="App.toggleTable()" id="btn-toggle-tbl">☷ Data Table</button>
+          </div>
+        </div>
+
+        <!-- Dataset / Indicator & Series / Country Selector -->
+        <div class="wb-controls">
+          <div class="ctrl-group">
+            <label class="ctrl-label" for="sel-dataset">
+              <span id="lbl-dataset">1. Select Economic Indicator / Dataset</span>
+              <span id="lbl-dataset-count"></span>
+            </label>
+            <select id="sel-dataset" class="ctrl-select" onchange="App.onSelectDataset(this.value)"></select>
+          </div>
+
+          <div class="ctrl-group">
+            <div class="ctrl-label">
+              <span id="lbl-series">2. Compare Series / Countries (click to toggle)</span>
+              <span>
+                <a href="#" onclick="App.clearSeriesSelection();return false;" style="color:var(--acc);font-weight:700;">Reset</a>
+              </span>
+            </div>
+            <div class="series-picker" id="series-picker"></div>
+          </div>
+        </div>
+
+        <!-- Adjustable Time Period Presets, Chart Type & Transform -->
+        <div class="time-toolbar">
+          <div class="preset-group" id="preset-btns">
+            <span class="toolbar-lbl">Time Period:</span>
+            <button type="button" class="tbtn" data-p="1Y" onclick="App.setPreset('1Y')">1Y</button>
+            <button type="button" class="tbtn" data-p="3Y" onclick="App.setPreset('3Y')">3Y</button>
+            <button type="button" class="tbtn" data-p="5Y" onclick="App.setPreset('5Y')">5Y</button>
+            <button type="button" class="tbtn" data-p="10Y" onclick="App.setPreset('10Y')">10Y</button>
+            <button type="button" class="tbtn" data-p="20Y" onclick="App.setPreset('20Y')">20Y</button>
+            <button type="button" class="tbtn active" data-p="MAX" onclick="App.setPreset('MAX')">MAX</button>
+          </div>
+
+          <div class="type-group" id="freq-btns" style="display:none;">
+            <span class="toolbar-lbl">Freq:</span>
+          </div>
+
+          <div class="type-group">
+            <span class="toolbar-lbl">Chart:</span>
+            <button type="button" class="tbtn active" data-ct="line" onclick="App.setChartType('line')">Line</button>
+            <button type="button" class="tbtn" data-ct="area" onclick="App.setChartType('area')">Area</button>
+            <button type="button" class="tbtn" data-ct="bar" onclick="App.setChartType('bar')">Bar</button>
+            <button type="button" class="tbtn" data-ct="scatter" onclick="App.setChartType('scatter')">Markers</button>
+          </div>
+
+          <div class="type-group">
+            <span class="toolbar-lbl">Scale:</span>
+            <button type="button" class="tbtn active" data-tr="raw" onclick="App.setTransform('raw')">Level</button>
+            <button type="button" class="tbtn" data-tr="yoy" onclick="App.setTransform('yoy')" title="Year-on-Year % Change">YoY %</button>
+            <button type="button" class="tbtn" data-tr="idx" onclick="App.setTransform('idx')" title="Rebase start of selected period = 100">Index=100</button>
+          </div>
+        </div>
+
+        <!-- Custom Start / End Period Selectors + Dual Range Sliders -->
+        <div class="range-bar">
+          <div class="range-inputs">
+            <span>From</span>
+            <select id="sel-start" onchange="App.onSelectRangeDropdowns()"></select>
+            <span>to</span>
+            <select id="sel-end" onchange="App.onSelectRangeDropdowns()"></select>
+          </div>
+          <div class="dual-slider">
+            <input type="range" id="rng-start" min="0" max="100" value="0" oninput="App.onSliderInput('start')" aria-label="Start Period"/>
+            <input type="range" id="rng-end" min="0" max="100" value="100" oninput="App.onSliderInput('end')" aria-label="End Period"/>
+          </div>
+          <span id="lbl-obs-count" style="font-size:12px;color:var(--mut);font-weight:700;"></span>
+        </div>
+
+        <!-- Main Interactive Plotly Graph -->
+        <div class="chart-legend" id="main-legend"></div>
+        <div id="main-chart"></div>
+
+        <!-- Summary Statistics for Active Time Window -->
+        <div class="stats-strip" id="stats-strip"></div>
+
+        <!-- Collapsible Data Table -->
+        <div class="data-drawer" id="data-drawer" style="display:none;">
+          <div class="table-scroll" id="table-scroll"></div>
+        </div>
+      </section>
+
+      <!-- Multi-Chart Category Gallery (Synchronized with Adjustable Time Period) -->
+      <section>
+        <div class="sec-title">
+          <span id="gallery-title">Featured Economic Charts</span>
+          <small id="gallery-sub">Click any chart to open in the interactive workbench above</small>
+        </div>
+        <div class="gallery-grid" id="gallery-grid"></div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Footer with Clear Official Data Sources Attribution -->
+  <footer>
+    <div class="wrap">
+      <div class="source-note">
+        <h4>Data Sources</h4>
+        <p>
+          <strong>Sri Lankan Economic Data:</strong> Extracted from official statistical tables and economic indicators published by the
+          <a href="https://www.cbsl.gov.lk/si" target="_blank" rel="noopener">Central Bank of Sri Lanka (ශ්‍රී ලංකා මහ බැංකුව — www.cbsl.gov.lk)</a>
+          and the Department of Census and Statistics (DCS).
+        </p>
+        <p>
+          <strong>Global Economic Data:</strong> Extracted from the World Economic Outlook, Fiscal Monitor, Global Debt Database, and Financial Statistics published by the
+          <a href="https://www.imf.org/en/home" target="_blank" rel="noopener">International Monetary Fund (www.imf.org)</a>.
+        </p>
+      </div>
+      <div class="cp">
+        &#169; <span id="cp-year"></span> LankaEconomy.lk &#183; <a href="https://lankaneconomy.blogspot.com/" id="footer-news-link" style="color:#fff;text-decoration:underline;">News Page</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/app.js" defer></script>
+</body>
+</html>

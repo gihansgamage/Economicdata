@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+cache/*.html
+cache/cbsl/
+cache/imf/
+.github/
+
+
