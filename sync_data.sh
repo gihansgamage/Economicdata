@@ -17,3 +17,4 @@ if ! git diff --staged --quiet; then
 else
   echo "[$(date -Iseconds)] Data is already up to date."
 fi
+
