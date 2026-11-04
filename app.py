@@ -13,6 +13,10 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
+import threading
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 from flask import Flask, abort, jsonify, request, send_from_directory
@@ -21,10 +25,53 @@ from backend.build_data import build_all_data
 
 ROOT_DIR = Path(__file__).resolve().parent
 DATA_DIR = ROOT_DIR / "data"
+AUTO_SYNC_INTERVAL_SEC = int(os.environ.get("AUTO_SYNC_HOURS", "6")) * 3600
 
 app = Flask(__name__, static_folder=str(ROOT_DIR), static_url_path="")
 
 _MEM_CACHE: dict[str, dict] = {}
+_SYNC_LOCK = threading.Lock()
+
+
+def _git_commit_and_push_data() -> bool:
+    """Commit updated data/*.json files and push to GitHub origin/main if changed."""
+    try:
+        subprocess.run(["git", "add", "data/summary.json", "data/cbsl_data.json", "data/imf_data.json"], cwd=ROOT_DIR, check=False)
+        diff = subprocess.run(["git", "diff", "--staged", "--quiet"], cwd=ROOT_DIR)
+        if diff.returncode != 0:
+            ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+            subprocess.run(["git", "commit", "-m", f"chore(data): auto-sync economic data ({ts})"], cwd=ROOT_DIR, check=False)
+            push = subprocess.run(["git", "push", "origin", "main"], cwd=ROOT_DIR, check=False)
+            return push.returncode == 0
+    except Exception as exc:
+        print(f"[auto-sync] git push warning: {exc}")
+    return False
+
+
+def sync_data_and_push(refresh_remote: bool = True, push_git: bool = True) -> dict:
+    """Thread-safe refresh of CBSL + IMF datasets and optional GitHub push."""
+    with _SYNC_LOCK:
+        summary = build_all_data(ROOT_DIR, refresh_remote=refresh_remote)
+        _MEM_CACHE.clear()
+        pushed = _git_commit_and_push_data() if push_git else False
+        return {
+            "status": "ok",
+            "pushed_to_github": pushed,
+            "stats": summary["stats"],
+            "generated_at": summary["generated_at"],
+        }
+
+
+def _background_auto_sync_loop() -> None:
+    """Periodically re-extracts CBSL & IMF data and pushes updates to GitHub."""
+    while True:
+        time.sleep(AUTO_SYNC_INTERVAL_SEC)
+        try:
+            print("[auto-sync] Running scheduled economic data sync...")
+            res = sync_data_and_push(refresh_remote=True, push_git=True)
+            print(f"[auto-sync] Completed at {res['generated_at']} (pushed={res['pushed_to_github']})")
+        except Exception as exc:
+            print(f"[auto-sync] Error during scheduled sync: {exc}")
 
 
 def _load_json(filename: str) -> dict:
@@ -153,15 +200,17 @@ def api_search():
 
 @app.route("/api/refresh", methods=["POST"])
 def api_refresh():
-    summary = build_all_data(ROOT_DIR, refresh_remote=True)
-    _MEM_CACHE.clear()
-    return jsonify({"status": "ok", "stats": summary["stats"], "generated_at": summary["generated_at"]})
+    result = sync_data_and_push(refresh_remote=True, push_git=True)
+    return jsonify(result)
 
 
 if __name__ == "__main__":
     if not (DATA_DIR / "summary.json").exists():
         build_all_data(ROOT_DIR, refresh_remote=False)
+    if os.environ.get("DISABLE_AUTO_SYNC") != "1":
+        t = threading.Thread(target=_background_auto_sync_loop, daemon=True)
+        t.start()
     port = int(os.environ.get("PORT", 5050))
-    print(f"LankaEconomy.lk Dashboard running on http://127.0.0.1:{port}")
+    print(f"LankaEconomy.lk Dashboard running on http://127.0.0.1:{port} (Auto-sync every {AUTO_SYNC_INTERVAL_SEC // 3600}h)")
     app.run(host="0.0.0.0", port=port, debug=False)
 
