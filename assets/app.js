@@ -697,27 +697,32 @@
         ? `Index (${startP} = 100)`
         : $("wb-unit").textContent.replace("Unit: ", "");
 
+    const isMobile = window.innerWidth <= 600;
     const layout = {
-      margin: { l: 64, r: 24, t: 16, b: 64 },
-      height: 450,
+      margin: isMobile
+        ? { l: 46, r: 12, t: 12, b: 52 }
+        : { l: 64, r: 24, t: 16, b: 64 },
+      height: isMobile ? 340 : 450,
       paper_bgcolor: "#ffffff",
       plot_bgcolor: "#ffffff",
-      font: { family: "Inter, sans-serif", size: 12, color: "#16202e" },
+      font: { family: "Inter, sans-serif", size: isMobile ? 10.5 : 12, color: "#16202e" },
       hovermode: "x unified",
       barmode: "group",
       showlegend: false,
       xaxis: {
         type: "category",
         gridcolor: "#edf1f6",
-        tickangle: -30,
-        nticks: 14,
+        tickangle: isMobile ? -35 : -30,
+        nticks: isMobile ? 7 : 14,
         automargin: true,
         showspikes: true,
         spikemode: "across",
         spikethickness: 1,
       },
       yaxis: {
-        title: { text: yLabel, font: { size: 11.5, color: "#5b6675" }, standoff: 10 },
+        title: isMobile
+          ? undefined
+          : { text: yLabel, font: { size: 11.5, color: "#5b6675" }, standoff: 10 },
         gridcolor: "#e6ebf2",
         automargin: true,
         zeroline: true,
@@ -730,6 +735,7 @@
       window.Plotly.react("main-chart", traces, layout, {
         responsive: true,
         displaylogo: false,
+        displayModeBar: !isMobile,
         modeBarButtonsToRemove: ["lasso2d", "select2d"],
       });
     }
@@ -916,27 +922,30 @@
 
       if (legendEl) legendEl.innerHTML = legendItems.join("");
 
+      const isMobile = window.innerWidth <= 600;
       window.Plotly.newPlot(
         containerId,
         traces,
         {
-          margin: { l: 46, r: 14, t: 10, b: 36 },
-          height: 220,
+          margin: isMobile
+            ? { l: 38, r: 8, t: 8, b: 32 }
+            : { l: 46, r: 14, t: 10, b: 36 },
+          height: isMobile ? 195 : 220,
           paper_bgcolor: "rgba(0,0,0,0)",
           plot_bgcolor: "rgba(0,0,0,0)",
           hovermode: "x unified",
           showlegend: false,
           xaxis: {
             type: "category",
-            nticks: 6,
+            nticks: isMobile ? 5 : 6,
             tickangle: 0,
             automargin: true,
-            tickfont: { size: 10, color: "#5b6675" },
+            tickfont: { size: isMobile ? 9.5 : 10, color: "#5b6675" },
             gridcolor: "#f1f5f9",
           },
           yaxis: {
             automargin: true,
-            tickfont: { size: 10, color: "#5b6675" },
+            tickfont: { size: isMobile ? 9.5 : 10, color: "#5b6675" },
             gridcolor: "#e2e8f0",
           },
         },
@@ -1100,6 +1109,16 @@
     openInWorkbench,
     refreshBackend,
   };
+
+  let _lastMobileState = window.innerWidth <= 600;
+  window.addEventListener("resize", () => {
+    const nowMobile = window.innerWidth <= 600;
+    if (nowMobile !== _lastMobileState) {
+      _lastMobileState = nowMobile;
+      renderMainChart();
+      renderGallery();
+    }
+  });
 
   window.addEventListener("DOMContentLoaded", init);
 })();
